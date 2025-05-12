@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from typing import List, Union
 from models.modelsBase import Cliente, init_db
 import sqlite3
-
+import requests
+from fastapi.responses import JSONResponse
 
 
 app = FastAPI()
@@ -17,23 +18,44 @@ init_db(DATABASE)
 # 1 - Cliente
 # Registrar - POST /clientes
 # listar - GET /clientes
-# consultar- GET /clientes/{pk} 
-# actualizar- PUT /clientes/{pk}
-# eliminar - DELETE /clientes/{pk}
+# consultar- GET /clientes/{CI} 
+# actualizar- PUT /clientes/{CI}
+# eliminar - DELETE /clientes/{CI}
 
-# 2 - Cuenta 
-# - POST /cuentas
-# - GET /cuentas
-# - GET /cuentas/{pk} 
-# - PUT /cuentas/{pk}
-# - DELETE /cuentas/{pk}
+# 2 - Deuda 
+# - POST /deuda
+# - GET /deuda
+# - GET /deuda/{CI} 
+# - PUT /deuda/{CI}
+# - DELETE /deuda/{CI}
 
-# 3 - Pago 
+# 3 - Pago  
 # - POST /pagos
 # - GET /pagos
 # - GET /pagos/{pk} 
 # - PUT /pagos/{pk}
 # - DELETE /pagos/{pk}
+
+# 3 - Banco 
+# - POST /pagos
+# - GET /pagos
+# - GET /pagos/{pk} 
+# - PUT /pagos/{pk}
+# - DELETE /pagos/{pk}
+
+URL_TELCO = "http://localhost:8000/telco/"
+
+@app.get("/deuda/{cedula}")
+def consulta_deuda(cedula: int):
+    response = requests.get(URL_TELCO+"deuda/"+str(cedula)).text
+    try:
+        deudas = response.json()
+        print(deudas)
+    except:
+        raise HTTPException(status_code=404, detail="Deuda not found")
+    
+    return JSONResponse(content=deudas)
+    
 
 
 @app.post("/clientes/", response_model=Cliente)
