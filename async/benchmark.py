@@ -15,9 +15,12 @@ import httpx
 async def medir_rendimiento(url: str, num_requests: int):
     """Mide el tiempo total para realizar múltiples solicitudes a una URL."""
     start_time = time.time()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         tasks = [client.get(url) for _ in range(num_requests)]
         await asyncio.gather(*tasks)
+        #syncio.gather sirve para se utiliza para ejecutar múltiples awaitables
+        #  (tareas asíncronas) de forma concurrente. Esto significa que todas las tareas que se le pasan comenzarán a 
+        # ejecutarse más o menos al mismo tiempo.
     end_time = time.time()
     duration = end_time - start_time
     print(f"Realizadas {num_requests} solicitudes a {url} en {duration:.2f} segundos.")
@@ -25,7 +28,7 @@ async def medir_rendimiento(url: str, num_requests: int):
 
 async def main():
     num_requests = 5  # Puedes ajustar el número de solicitudes
-    delay = 2         # Puedes ajustar el tiempo de espera de las tareas
+    delay = 1         # Puedes ajustar el tiempo de espera de las tareas
 
     print("\n--- Rendimiento de la API Síncrona (una solicitud) ---")
     await medir_rendimiento(f"http://localhost:8001/sync/{delay}", 1)
