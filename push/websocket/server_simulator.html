@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Demo WebSocket - Sistema de Eventos</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .panel { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-connect { background: #4CAF50; color: white; }
+        .btn-disconnect { background: #f44336; color: white; }
+        .btn-action { background: #2196F3; color: white; }
+        .btn-simulation { background: #FF9800; color: white; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .status.connected { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .status.disconnected { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .messages { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; }
+        .message { margin: 5px 0; padding: 8px; border-radius: 4px; }
+        .message.sensor { background: #e3f2fd; border-left: 4px solid #2196F3; }
+        .message.alert { background: #ffebee; border-left: 4px solid #f44336; }
+        .message.system { background: #f3e5f5; border-left: 4px solid #9c27b0; }
+        .message.user { background: #e8f5e8; border-left: 4px solid #4caf50; }
+        input[type="text"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .stats { font-family: monospace; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Demo WebSocket - Sistema de Eventos en Tiempo Real</h1>
+        <h2> Integracion de sistemas - UCOM - 2025</h2>
+        <div class="panel">
+            <h2>Control de Conexión</h2>
+            <div class="controls">
+                <select id="clientType">
+                    <option value="dashboard">Dashboard</option>
+                    <option value="monitor">Monitor</option>
+                    <option value="admin">Admin</option>
+                    <option value="general">General</option>
+                </select>
+                <input type="text" id="clientId" placeholder="ID del cliente (opcional)">
+                <button class="btn-connect" onclick="connect()">Conectar</button>
+                <button class="btn-disconnect" onclick="disconnect()">Desconectar</button>
+            </div>
+            <div id="connectionStatus" class="status disconnected">Desconectado</div>
+        </div>
+
+        <div class="grid">
+            <div class="panel">
+                <h2>Acciones</h2>
+                <div class="controls">
+                    <button class="btn-action" onclick="sendPing()">Ping</button>
+                    <button class="btn-action" onclick="getStats()">Estadísticas</button>
+                    <button class="btn-simulation" onclick="startSimulation()">Iniciar Simulación</button>
+                    <button class="btn-simulation" onclick="stopSimulation()">Detener Simulación</button>
+                </div>
+                <div class="controls">
+                    <input type="text" id="messageInput" placeholder="Mensaje para broadcast">
+                    <button class="btn-action" onclick="sendBroadcast()">Enviar a Grupo</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Estadísticas de Conexión</h2>
+                <div id="stats" class="stats">No disponible</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Mensajes Recibidos</h2>
+            <button onclick="clearMessages()" style="float: right;">Limpiar</button>
+            <div id="messages" class="messages"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+
+        function connect() {
+            if (ws) {
+                ws.close();
+            }
+
+            const clientType = document.getElementById('clientType').value;
+            const clientId = document.getElementById('clientId').value;
+            const url = `ws://localhost:8000/ws/${clientType}${clientId ? '?client_id=' + clientId : ''}`;
+
+            ws = new WebSocket(url);
+
+            ws.onopen = function(event) {
+                isConnected = true;
+                updateConnectionStatus('Conectado como ' + clientType, true);
+                addMessage('system', 'Conectado al servidor WebSocket');
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onclose = function(event) {
+                isConnected = false;
+                updateConnectionStatus('Desconectado', false);
+                addMessage('system', 'Conexión cerrada');
+            };
+
+            ws.onerror = function(error) {
+                addMessage('alert', 'Error de conexión: ' + error);
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function updateConnectionStatus(message, connected) {
+            const status = document.getElementById('connectionStatus');
+            status.textContent = message;
+            status.className = 'status ' + (connected ? 'connected' : 'disconnected');
+        }
+
+        function handleMessage(data) {
+            switch(data.type) {
+                case 'sensor_data':
+                    addMessage('sensor', 
+                        `📊 ${data.sensor_id}: ${data.value} ${data.unit} (${data.location})`);
+                    break;
+                case 'alert':
+                    addMessage('alert', 
+                        `⚠️ ${data.alert_type}: ${data.message} [${data.severity}]`);
+                    break;
+                case 'system_status':
+                    addMessage('system', 
+                        `🖥️ CPU: ${data.cpu_usage}% | RAM: ${data.memory_usage}% | Conexiones: ${data.active_connections}`);
+                    break;
+                case 'stats':
+                    updateStats(data.data);
+                    break;
+                case 'user_message':
+                    addMessage('user', `💬 ${data.from}: ${data.message}`);
+                    break;
+                default:
+                    addMessage('system', JSON.stringify(data, null, 2));
+            }
+        }
+
+        function addMessage(type, content) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + type;
+            messageDiv.innerHTML = `<small>${new Date().toLocaleTimeString()}</small><br>${content}`;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function updateStats(stats) {
+            const statsDiv = document.getElementById('stats');
+            statsDiv.innerHTML = `
+                <strong>Total de conexiones:</strong> ${stats.total}<br>
+                <strong>Por tipo:</strong><br>
+                ${Object.entries(stats.by_type).map(([type, count]) => 
+                    `&nbsp;&nbsp;${type}: ${count}`).join('<br>')}
+            `;
+        }
+
+        function sendMessage(message) {
+            if (ws && isConnected) {
+                ws.send(JSON.stringify(message));
+            } else {
+                alert('No hay conexión WebSocket activa');
+            }
+        }
+
+        function sendPing() {
+            sendMessage({action: 'ping'});
+        }
+
+        function getStats() {
+            sendMessage({action: 'get_stats'});
+        }
+
+        function sendBroadcast() {
+            const input = document.getElementById('messageInput');
+            if (input.value.trim()) {
+                sendMessage({
+                    action: 'broadcast',
+                    message: input.value
+                });
+                input.value = '';
+            }
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        async function startSimulation() {
+            try {
+                const response = await fetch('/start-simulation', {method: 'POST'});
+                const result = await response.json();
+                addMessage('system', '🚀 ' + result.message);
+            } catch (error) {
+                addMessage('alert', 'Error iniciando simulación: ' + error);
+            }
+        }
+
+        async function stopSimulation() {
+            try {
+                const response = await fetch('/stop-simulation', {method: 'POST'});
+                const result = await response.json();
+                addMessage('system', '⏹️ ' + result.message);
+            } catch (error) {
+                addMessage('alert', 'Error deteniendo simulación: ' + error);
+            }
+        }
+
+        // Auto-conectar al cargar la página
+        window.onload = function() {
+            // Opcional: conectar automáticamente
+            // connect();
+        };
+    </script>
+</body>
+</html>
