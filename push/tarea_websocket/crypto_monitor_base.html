@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Monitor de Criptomonedas en Tiempo Real</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-width: 400px;
+            max-width: 600px;
+            width: 90%;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+        }
+        .crypto-item {
+            display: flex;
+            flex-direction: column; /* Cambiado a columna para el historial */
+            align-items: flex-start; /* Alinea los ítems a la izquierda */
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .crypto-item:last-child {
+            border-bottom: none;
+        }
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%; /* Asegura que la fila de precio ocupe todo el ancho */
+        }
+        .crypto-name {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #555;
+            flex-grow: 1;
+            text-align: left;
+        }
+        .price-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .crypto-price {
+            font-size: 1.4em;
+            color: #007bff;
+            font-weight: bold;
+            transition: color 0.3s ease-in-out;
+            min-width: 120px;
+            text-align: right;
+        }
+        .price-up {
+            color: #28a745 !important; /* Verde */
+        }
+        .price-down {
+            color: #dc3545 !important; /* Rojo */
+        }
+        .trend-arrow {
+            font-size: 1.2em;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            text-align: center;
+        }
+        .trend-arrow.up {
+            color: #28a745;
+        }
+        .trend-arrow.down {
+            color: #dc3545;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        /* Estilos para el historial de precios */
+        .price-history {
+            width: 100%;
+            margin-top: 5px;
+            padding-left: 20px; /* Indentar el historial */
+            font-size: 0.85em;
+            color: #777;
+            text-align: left;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .history-item {
+            background-color: #f8f9fa;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            white-space: nowrap; /* Evita que los precios se rompan */
+        }
+
+        /* Estilos para el panel de selección de criptos */
+        .selection-panel {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            margin-top: 20px;
+            text-align: left;
+            width: 90%;
+            max-width: 600px;
+        }
+        .selection-panel h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1.2em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .crypto-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+        }
+        .crypto-checkboxes label {
+            display: flex;
+            align-items: center;
+            font-size: 1em;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background-color: #e9ecef;
+            transition: background-color 0.2s ease;
+        }
+        .crypto-checkboxes label:hover {
+            background-color: #dee2e6;
+        }
+        .crypto-checkboxes input[type="checkbox"] {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    
+
+    <div class="container">
+        <h1>📈 Monitor de Precios de Criptomonedas</h1>
+        <div class="selection-panel">
+        <h2>Seleccionar Criptomonedas</h2>
+        <div class="crypto-checkboxes" id="crypto-checkboxes">
+                <label><input type="checkbox" name="crypto" value="BTC" checked> Bitcoin (BTC)</label>
+                <label><input type="checkbox" name="crypto" value="ETH" checked> Ethereum (ETH)</label>
+                <label><input type="checkbox" name="crypto" value="DOGE" checked> Dogecoin (DOGE)</label>
+                <label><input type="checkbox" name="crypto" value="LTC" checked> Litecoin (LTC)</label>
+                <label><input type="checkbox" name="crypto" value="XRP" checked> XRP (XRP)</label>
+            </div>
+        </div>
+        <div id="crypto-list">
+            </div>
+        <p class="status">Estado: <span id="ws-status">Desconectado</span></p>
+    </div>
+
+    
+
+    <script>
+        const wsStatusElem = document.getElementById('ws-status');
+        const cryptoCheckboxesContainer = document.getElementById('crypto-checkboxes');
+        const cryptoListContainer = document.getElementById('crypto-list');
+
+        const priceHistory = {};
+        const HISTORY_SIZE = 5; // Guardar los últimos 5 precios
+
+        const cryptoElements = {}; // Ej: { "BTC": { priceElem: ..., arrowElem: ..., historyElem: ... } }
+
+        const availableCryptos = ["BTC", "ETH", "DOGE", "LTC", "XRP"];
+        availableCryptos.forEach(symbol => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'crypto-item';
+            itemDiv.innerHTML = `
+                <div class="price-row">
+                    <span class="crypto-name">${symbol}</span>
+                    <div class="price-display">
+                        <span id="${symbol.toLowerCase()}-arrow" class="trend-arrow"></span>
+                        <span id="${symbol.toLowerCase()}-price" class="crypto-price">$ --.--</span>
+                    </div>
+                </div>
+                <div id="${symbol.toLowerCase()}-history" class="price-history"></div>
+            `;
+            cryptoListContainer.appendChild(itemDiv);
+
+            cryptoElements[symbol] = {
+                priceElem: document.getElementById(`${symbol.toLowerCase()}-price`),
+                arrowElem: document.getElementById(`${symbol.toLowerCase()}-arrow`),
+                historyElem: document.getElementById(`${symbol.toLowerCase()}-history`) // Nuevo elemento para el historial
+            };
+            priceHistory[symbol] = [];
+        });
+
+        let ws = new WebSocket(`ws://127.0.0.1:8000/ws/crypto_prices`); // Usar 'let' para reasignar en reconexión
+
+        ws.onopen = function(event) {
+            console.log('Conexión WebSocket abierta.');
+            wsStatusElem.textContent = 'Conectado';
+            wsStatusElem.style.color = '#28a745';
+            sendCryptoPreferences(); // Envía las preferencias iniciales
+        };
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            for (const symbol in data) {
+                if (cryptoElements[symbol]) {
+                    const newPrice = data[symbol];
+                    const priceElem = cryptoElements[symbol].priceElem;
+                    const arrowElem = cryptoElements[symbol].arrowElem;
+                    const historyElem = cryptoElements[symbol].historyElem; // Obtener el elemento del historial
+
+                    const currentHistory = priceHistory[symbol];
+                    const oldPrice = currentHistory.length > 0 ? currentHistory[currentHistory.length - 1] : undefined;
+
+                    currentHistory.push(newPrice);
+                    if (currentHistory.length > HISTORY_SIZE) {
+                        currentHistory.shift();
+                    }
+
+                    updatePriceDisplay(priceElem, arrowElem, newPrice, oldPrice);
+                    updateHistoryDisplay(historyElem, currentHistory); // Actualizar la visualización del historial
+                }
+            }
+        };
+
+        ws.onclose = function(event) {
+            console.log('Conexión WebSocket cerrada.', event);
+            wsStatusElem.textContent = 'Desconectado';
+            wsStatusElem.style.color = '#dc3545';
+            setTimeout(() => {
+                wsStatusElem.textContent = 'Reconectando...';
+                wsStatusElem.style.color = '#ffc107';
+                ws = new WebSocket(`ws://127.0.0.1:8000/ws/crypto_prices`); // Reasignar ws
+            }, 5000);
+        };
+
+        ws.onerror = function(error) {
+            console.error('Error en WebSocket:', error);
+            wsStatusElem.textContent = 'Error';
+            wsStatusElem.style.color = '#dc3545';
+        };
+
+        function updatePriceDisplay(priceElement, arrowElement, newPrice, oldPrice) {
+            priceElement.textContent = `$ ${newPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+            priceElement.classList.remove('price-up', 'price-down');
+
+            arrowElement.textContent = '';
+            arrowElement.classList.remove('up', 'down');
+
+            if (oldPrice !== undefined) {
+                if (newPrice > oldPrice) {
+                    priceElement.classList.add('price-up');
+                    arrowElement.textContent = '▲';
+                    arrowElement.classList.add('up');
+                } else if (newPrice < oldPrice) {
+                    priceElement.classList.add('price-down');
+                    arrowElement.textContent = '▼';
+                    arrowElement.classList.add('down');
+                }
+            }
+
+            setTimeout(() => {
+                priceElement.classList.remove('price-up', 'price-down');
+                arrowElement.textContent = '';
+                arrowElement.classList.remove('up', 'down');
+            }, 700);
+        }
+
+        // Nueva función para actualizar la visualización del historial
+        function updateHistoryDisplay(historyElement, historyArray) {
+            historyElement.innerHTML = ''; // Limpiar historial anterior
+            historyArray.slice(0, HISTORY_SIZE).forEach(price => { // Tomar solo los últimos HISTORY_SIZE
+                const span = document.createElement('span');
+                span.className = 'history-item';
+                span.textContent = `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+                historyElement.appendChild(span);
+            });
+        }
+
+        function sendCryptoPreferences() {
+            const selectedCryptos = Array.from(cryptoCheckboxesContainer.querySelectorAll('input[name="crypto"]:checked'))
+                                         .map(checkbox => checkbox.value);
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "update_prefs", cryptos: selectedCryptos }));
+            }
+           
+            // Ocultar/mostrar elementos de la lista en el cliente para que solo se vean las seleccionadas
+            availableCryptos.forEach(symbol => {
+                const itemDiv = cryptoElements[symbol].priceElem.closest('.crypto-item');
+                if (selectedCryptos.includes(symbol)) {
+                    itemDiv.style.display = 'flex'; // Usamos flex para la columna
+                } else {
+                    itemDiv.style.display = 'none';
+                }
+            });
+            // También limpiar el historial de las que se ocultan para evitar desorden visual
+            for (const symbol of availableCryptos) {
+                if (!selectedCryptos.includes(symbol)) {
+                    priceHistory[symbol] = []; // Limpiar historial
+                    if(cryptoElements[symbol]) {
+                        cryptoElements[symbol].historyElem.innerHTML = ''; // Limpiar display
+                        cryptoElements[symbol].priceElem.textContent = '$ --.--'; // Resetear precio
+                        cryptoElements[symbol].arrowElem.textContent = ''; // Resetear flecha
+                    }
+                }
+            }
+            
+        }
+
+        cryptoCheckboxesContainer.addEventListener('change', sendCryptoPreferences);
+
+    </script>
+</body>
+</html>
