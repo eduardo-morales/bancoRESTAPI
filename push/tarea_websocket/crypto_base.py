@@ -31,8 +31,7 @@ async def get_crypto_monitor_page():
     Debe manejar el caso en que el archivo no se encuentre.
     """
     try:
-        with open(HTML_FILE_PATH, "r", encoding="utf-8") as f:
-            html_content = f.read()
+        # TODO cargar el contenido del archivo HTML
         return HTMLResponse(content=html_content)
     except FileNotFoundError:
         print(f"Error: Archivo HTML no encontrado en {HTML_FILE_PATH}")
