@@ -1,5 +1,5 @@
 pip install fastapi 'strawberry-graphql[fastapi]' sqlalchemy databases uvicorn
-
+pip install requests-toolbelt
 ## ejecucion
 uvicorn graphql_main:app --reload
 

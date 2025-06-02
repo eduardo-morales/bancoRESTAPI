@@ -42,9 +42,9 @@ class Query:
     @strawberry.field
     def all_clientes(self, info: Info, nombre: Optional[str] = None) -> List[Cliente]:
         session = SessionLocal()
-        clientes = session.query(ClienteModel).options(
+        query = session.query(ClienteModel).options(
                 joinedload(ClienteModel.cuentas).joinedload(CuentaModel.pagos)
-            ).all()
+            )
         if nombre:
             query = query.filter(ClienteModel.nombre == nombre)
         clientes = query.all()
