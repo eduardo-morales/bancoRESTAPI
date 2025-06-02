@@ -41,15 +41,31 @@ class Matriculacion:
 
 @strawberry.type
 class Query:
-    @strawberry.field
+    @strawberry.field(name="colegios")
     def colegios(self, info: Info) -> List[Colegio]:
         db = next(get_db())
         return db.query(ColegioModel).all()
 
     @strawberry.field
-    def alumnos(self, info: Info) -> List[Alumno]:
-        db = next(get_db())
-        return db.query(AlumnoModel).all()
+    def alumnos(
+        self, 
+        info: Info,
+        nombre: Optional[str] = None,
+        apellido: Optional[str] = None,
+        colegio_id: Optional[int] = None,
+    ) -> List[Alumno]:
+        db: Session = next(get_db())
+        query = db.query(AlumnoModel)
+
+        if nombre:
+            query = query.filter(AlumnoModel.nombre.ilike(f"%{nombre}%"))
+        if apellido:
+            query = query.filter(AlumnoModel.apellido.ilike(f"%{apellido}%"))
+        if colegio_id:
+            query = query.filter(AlumnoModel.colegio_id == colegio_id)
+
+        resultados = query.all()
+        return resultados
 
     @strawberry.field
     def materias(self, info: Info) -> List[Materia]:

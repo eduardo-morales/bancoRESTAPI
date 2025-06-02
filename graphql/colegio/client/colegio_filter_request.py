@@ -12,9 +12,8 @@ def get_clients_named(name):
 
     query = gql("""
     query ($name: String) {
-      allClientes(nombre: $name) {
+      alumnos(nombre: $name) {
         id
-        cedula
         nombre
         apellido
       }
@@ -23,10 +22,10 @@ def get_clients_named(name):
 
     params = {"name": name}
     result = client.execute(query, variable_values=params)
-    return result['allClientes']
+    return result['alumnos']
 
 if __name__ == "__main__":
-    nombre = "eduardo"
+    nombre = "Eduardo"
     clientes = get_clients_named(nombre)
     for cliente in clientes:
-        print(f"ID: {cliente['id']}, Cedula: {cliente['cedula']}, Nombre: {cliente['nombre']}, Apellido: {cliente['apellido']}")
+        print(f"ID: {cliente['id']},  Nombre: {cliente['nombre']}, Apellido: {cliente['apellido']}")
